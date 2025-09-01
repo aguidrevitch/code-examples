@@ -120,7 +120,7 @@ export async function extractFeaturesFromHTML(page: Page, _magicRatio = 0.5): Pr
             }
         }
 
-        const [left, top, width, height] = layout.bounds[nodeIndex].map((value: number) => value * _magicRatio);
+        const [left, top, width, height] = layout.bounds[nodeIndex].map((value: number) => value); // * _magicRatio);
 
         // they can be undefined for things like documentElement
         // if (!top && !left && !width && !height) {
