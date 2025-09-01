@@ -1,0 +1,30 @@
+{
+  "name": "@watchero/types",
+  "version": "0.0.1",
+  "description": "Shared Types for Watchero",
+  "author": {
+    "name": "Aleksandr Guidrevitch",
+    "email": "aguidrevitch@gmail.com",
+    "url": "https://excitingstartup.com"
+  },
+  "license": "UNLICENSED",
+  "type": "module",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "scripts": {
+    "lint": "eslint --config .eslintrc.mjs",
+    "fix": "npm run lint -- --fix",
+    "build": "rm -rf dist/; npm run lint && tsc --project tsconfig.json",
+    "prepack": "npm run lint"
+  },
+  "main": "dist/index.mjs",
+  "types": "dist/index.d.mts",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "zod": "^3.25.42",
+    "typescript": "^5.6.3"
+  }
+}

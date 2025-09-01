@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        header {
+            height: 50px;
+        }
+
+        main {
+            padding: 20px;
+        }
+
+        .nested {
+            padding: 10px;
+        }
+        .nested::after {
+            content: 'Hello world!';
+            display: block;
+            height: 20px;
+            background-color: lightblue;
+        }
+    </style>
+</head>
+
+<body>
+    <header>Header</header>
+    <main>
+        <div class="nested">
+            <div class="deeply-nested">Deep content</div>
+        </div>
+    </main>
+    <footer>Footer</footer>
+</body>
+
+</html>

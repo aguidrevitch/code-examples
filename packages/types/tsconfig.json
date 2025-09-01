@@ -1,0 +1,25 @@
+{
+	"compilerOptions": {
+		"allowJs": true,
+		"checkJs": false,
+		"esModuleInterop": true,
+		"allowSyntheticDefaultImports": true,
+		"forceConsistentCasingInFileNames": true,
+		"moduleResolution": "NodeNext",
+		"module": "NodeNext",
+		"resolveJsonModule": true,
+		"skipLibCheck": true,
+		"strict": true,
+		"target": "es2022",
+		"outDir": "dist",
+		"baseUrl": "src", // This must be specified if "paths" is.
+		"declaration": true,
+		"paths": {
+			"@/*": ["*"],
+		},
+		"typeRoots": [
+			"./node_modules/@types", 
+			"./src/types"
+		]
+	}
+}

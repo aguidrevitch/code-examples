@@ -1,0 +1,35 @@
+{
+	"compilerOptions": {
+		"allowJs": true,
+		"checkJs": false,
+		"esModuleInterop": true,
+		"allowSyntheticDefaultImports": true,
+		"forceConsistentCasingInFileNames": true,
+		"moduleResolution": "NodeNext",
+		"module": "NodeNext",
+		"resolveJsonModule": true,
+		"skipLibCheck": true,
+		"strict": true,
+		"target": "es2021",
+		"outDir": "dist",
+		"sourceMap": true,
+		"declaration": true,
+		"baseUrl": "src", // This must be specified if "paths" is.
+		"paths": {
+			"@/*": ["*"],
+		},
+		// "preserveConstEnums": true,
+		// "rootDirs": ["src", "tests"],
+		// "typeRoots": ["./node_modules/@types", "./src/types"],
+		// "plugins": [{ "transform": "@zerollup/ts-transform-paths" }],
+	},
+	// "include": ["src", "tests"],
+	"tsc-alias": {
+		"verbose": false,
+		"debug": false,
+		"resolveFullPaths": true,
+		"compilerOptions": {
+			"outDir": "dist/src",
+		}
+	}
+}

@@ -1,0 +1,27 @@
+{
+  "name": "watchero-servers",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "pnpm --recursive --workspace-concurrency=1 --no-bail run test",
+    "lint": "pnpm --recursive run lint",
+    "build": "pnpm --recursive run build",
+    "postinstall": "pnpm --recursive run build && pnpx puppeteer browsers install chrome"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.14.0",
+    "@typescript-eslint/parser": "^8.14.0",
+    "eslint": "=9.14.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.2.1",
+    "globals": "^15.12.0",
+    "prettier": "^3.3.3"
+  },
+  "dependencies": {
+    "npm": "^10.9.0"
+  }
+}

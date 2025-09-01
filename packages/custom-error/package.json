@@ -1,0 +1,41 @@
+{
+    "name": "@watchero/custom-error",
+    "version": "0.0.1",
+    "description": "CustomError class",
+    "author": {
+        "name": "Aleksandr Guidrevitch",
+        "email": "aguidrevitch@gmail.com",
+        "url": "https://excitingstartup.com"
+    },
+    "license": "UNLICENSED",
+    "publishConfig": {
+        "registry": "https://npm.pkg.github.com"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git://github.com/aguidrevitch/watchero-servers.git#master"
+    },
+    "bugs": {
+        "url": "https://github.com/aguidrevitch/watchero-servers/issues"
+    },
+    "scripts": {
+        "lint": "eslint --config .eslintrc.mjs",
+        "fix": "npm run lint -- --fix",
+        "preversion": "npm run lint",
+        "prepack": "npm run lint"
+    },
+    "main": "src/index.mjs",
+    "types": "src/index.d.ts",
+    "files": [
+        "src/**/*"
+    ],
+    "keywords": [
+        "error"
+    ],
+    "engines": {
+        "node": ">=18"
+    },
+    "devDependencies": {
+        "eslint": "^9"
+    }
+}
