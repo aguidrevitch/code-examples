@@ -1,22 +1,20 @@
 import { z } from "zod";
-import { ExtractedFeatureSchema } from "./extracted-feature.mjs";
+import { ExtractedFeature, ExtractedFeatureSchema } from "./extracted-feature.mjs";
+import { ExtractedFeatureError, ExtractedFeatureErrorSchema } from "./extracted-feature-error.mjs";
 
-const Base = {
-    url: z.string().url(),
-    metadata: z.record(z.unknown()).optional(),
-};
-
+// prettier-ignore
 export const ExtractFeaturesResponseSchema = z.union([
-    z.object({
-        ...Base,
-        features: ExtractedFeatureSchema,
-        error: z.undefined(),
-    }),
-    z.object({
-        ...Base,
-        features: z.undefined(),
-        error: z.string(),
-    }),
+    ExtractedFeatureSchema,
+    ExtractedFeatureErrorSchema,
 ]);
 
 export type ExtractFeaturesResponse = z.infer<typeof ExtractFeaturesResponseSchema>;
+
+// typeguard helper
+export const isExtractedFeatureSuccess = (obj: unknown): obj is ExtractedFeature => {
+    return (obj as ExtractedFeatureError).error === undefined;
+};
+
+export const isExtractedFeatureError = (obj: unknown): obj is ExtractedFeatureError => {
+    return (obj as ExtractedFeatureError).error !== undefined;
+};

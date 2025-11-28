@@ -35,11 +35,17 @@ export const HTMLElementFeatureSchema = z.object({
         right: z.number(),
         bottom: z.number(),
         left: z.number(),
-        width: z.number(),
-        height: z.number(),
-        x: z.number(),
-        y: z.number(),
+        // width: z.number(),
+        // height: z.number(),
+        // x: z.number(),
+        // y: z.number(),
     }),
+    textBBoxes: z.array(z.object({
+        top: z.number(),
+        right: z.number(),
+        bottom: z.number(),
+        left: z.number(),
+    })),
 });
 
 export type HTMLElementFeature = z.infer<typeof HTMLElementFeatureSchema>;

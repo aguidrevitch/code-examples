@@ -1,6 +1,3 @@
-// based on chromium code
-import { CustomError } from "@watchero/custom-error";
-
 /**
  * Generates unique CSS selectors for all elements in the document
  * using a DOM TreeWalker with iterative approach
@@ -66,16 +63,20 @@ export const injectGenerateUniqueSelectors = function (): void {
             }
 
             const parentData = parentMap.get(parent)!;
+
+            // this is needed for properly addressing various
+            // interception of getAttribute calls, eg in Fastpixel
+            const clonedNode = currentNode.cloneNode(false) as Element;
             const tag = currentNode.tagName.toLowerCase();
 
             // Process the current node
             const nodeData: NodeData = {
                 node: currentNode,
                 tag,
-                classes: Array.from(currentNode.classList),
-                id: currentNode.id,
-                href: currentNode.getAttribute("href"),
-                src: currentNode.getAttribute("src"),
+                classes: Array.from(clonedNode.classList),
+                id: clonedNode.id,
+                href: clonedNode.getAttribute("href"),
+                src: clonedNode.getAttribute("src"),
             };
 
             // Update tag count
@@ -131,14 +132,17 @@ export const injectGenerateUniqueSelectors = function (): void {
             const parentData = parentMap.get(parent)!;
             const tag = currentNode.tagName.toLowerCase();
 
+            // this is needed for properly addressing various
+            // interception of getAttribute calls, eg in Fastpixel
+            const clonedNode = currentNode.cloneNode(false) as Element;
             // Process the current node
             const nodeData: NodeData = {
                 node: currentNode,
                 tag,
-                classes: Array.from(currentNode.classList),
-                id: currentNode.id,
-                href: currentNode.getAttribute("href"),
-                src: currentNode.getAttribute("src"),
+                classes: Array.from(clonedNode.classList),
+                id: clonedNode.id,
+                href: clonedNode.getAttribute("href"),
+                src: clonedNode.getAttribute("src"),
             };
             const selector = getBestSelector(nodeData, parentData);
             const parts = [selector];
@@ -158,13 +162,17 @@ export const injectGenerateUniqueSelectors = function (): void {
                     break;
                 }
 
+                // this is needed for properly addressing various
+                // interception of getAttribute calls, eg in Fastpixel
+                const clonedAncestor = ancestor.cloneNode(false) as Element;
+                // Process ancestor node
                 const ancestorData: NodeData = {
                     node: ancestor,
-                    tag: ancestor.tagName.toLowerCase(),
-                    classes: Array.from(ancestor.classList),
-                    id: ancestor.id,
-                    href: ancestor.getAttribute("href"),
-                    src: ancestor.getAttribute("src"),
+                    tag: clonedAncestor.tagName.toLowerCase(),
+                    classes: Array.from(clonedAncestor.classList),
+                    id: clonedAncestor.id,
+                    href: clonedAncestor.getAttribute("href"),
+                    src: clonedAncestor.getAttribute("src"),
                 };
 
                 const ancestorSelector = getBestSelector(ancestorData, ancestorParentData);
@@ -173,6 +181,11 @@ export const injectGenerateUniqueSelectors = function (): void {
 
                 // go one level higher
                 ancestor = ancestorParent;
+            }
+
+            if (currentNode !== document.documentElement) {
+                // Ensure selectors always anchor at the root to avoid duplicate matches.
+                parts.unshift("html");
             }
 
             const fullSelector = parts.join(" > ");
@@ -186,16 +199,12 @@ export const injectGenerateUniqueSelectors = function (): void {
         nodeSelectors.set(document.documentElement, "html");
 
         // Print all selectors
-        console.log("=== Unique CSS Selectors ===");
-        nodeSelectors.forEach((selector, node) => {
-            console.log(`${selector} -> ${node.tagName}`);
-
+        nodeSelectors.forEach((selector) => {
             // Validate selector
             const currentNode = document.querySelectorAll(selector);
             if (currentNode.length !== 1) {
-                throw new CustomError(`Selector "${selector}" matches ${currentNode.length} elements!`);
+                throw new Error(`Selector "${selector}" matches ${currentNode.length} elements!`);
             }
-
             currentNode[0].setAttribute("data-watchero-selector", selector);
         });
 
@@ -216,27 +225,27 @@ export const injectGenerateUniqueSelectors = function (): void {
         // 2. Try to find a unique class
         const uniqueClasses = classes.filter((cls) => parentData.classFrequency[cls] === 1);
         if (uniqueClasses.length > 0) {
-            return `${tag}.${uniqueClasses[0]}`;
+            return `${escapeAttribute(tag)}.${escapeAttribute(uniqueClasses[0])}`;
         }
 
         // 3. Try to use unique href
         if (href && parentData.hrefValues[href] === 1) {
-            return `${tag}[href="${escapeAttribute(href)}"]`;
+            return `${escapeAttribute(tag)}[href="${escapeAttribute(href)}"]`;
         }
 
         // 4. Try to use unique src
         if (src && parentData.srcValues[src] === 1) {
-            return `${tag}[src="${escapeAttribute(src)}"]`;
+            return `${escapeAttribute(tag)}[src="${escapeAttribute(src)}"]`;
         }
 
         if (parentData.tagCounts[tag] > 1) {
             // 5. If the tag is not unique, use nth-child
             const index = Array.from(parentData.children).findIndex((child) => child.node === nodeData.node) + 1;
-            return `${tag}:nth-child(${index})`;
+            return `${escapeAttribute(tag)}:nth-child(${index})`;
         }
 
         // 5. Just use the tag name - positioning will be added later if needed
-        return tag;
+        return escapeAttribute(tag);
     }
 
     /**

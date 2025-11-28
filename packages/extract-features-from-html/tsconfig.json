@@ -7,26 +7,27 @@
 		"forceConsistentCasingInFileNames": true,
 		"moduleResolution": "NodeNext",
 		"module": "NodeNext",
+		"declaration": true,
 		"resolveJsonModule": true,
 		"skipLibCheck": true,
 		"strict": true,
-		"target": "es2021",
+		"target": "ES2022",
+		"lib": ["ES2022", "DOM"],
 		"outDir": "dist",
+		"declarationMap": true,
 		"sourceMap": true,
-		"declaration": true,
+		"isolatedModules": true,
 		"baseUrl": "src", // This must be specified if "paths" is.
 		"paths": {
-			"@/*": ["*"],
-		},
-		// "preserveConstEnums": true,
-		// "rootDirs": ["src", "tests"],
-		// "typeRoots": ["./node_modules/@types", "./src/types"],
-		// "plugins": [{ "transform": "@zerollup/ts-transform-paths" }],
+			"@/*": ["*"]
+		}
 	},
-	// "include": ["src", "tests"],
+	"exclude": [
+		"dist/",
+    ],
 	"tsc-alias": {
-		"verbose": false,
-		"debug": false,
+		"verbose": true,
+		"debug": true,
 		"resolveFullPaths": true,
 		"compilerOptions": {
 			"outDir": "dist/src",

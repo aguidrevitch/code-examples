@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ViewportSchema } from "./viewport.mjs";
+import { SnapshotOptionsSchema } from "./snapshot-request.mjs";
 
 export const ExtractFeaturesRequestSchema = z.object({
     url: z.string().url(),
@@ -12,7 +13,13 @@ export const ExtractFeaturesRequestSchema = z.object({
         })
         .optional(),
     // any additional metadata that might be useful to be posted back
-    metadata: z.record(z.any()).optional(),
+    metadata: z
+        .object({
+            userId: z.string().cuid(),
+            snapshotId: z.string().cuid(),
+        })
+        .passthrough(),
+    options: SnapshotOptionsSchema.optional(),
 });
 
 export type ExtractFeaturesRequest = z.infer<typeof ExtractFeaturesRequestSchema>;

@@ -11,5 +11,9 @@
 <body class="body">
     <div id="box1">Box 1</div>
     <div id="box2">Box 2<span>Text</span>Text<!-- comment 1 --><!-- comment 2 --></div>
+    <script>
+        const duplicate = document.getElementById("box1").cloneNode(true);
+        document.documentElement.appendChild(duplicate);
+    </script>
 </body>
 </html>

@@ -4,6 +4,7 @@ import { Server } from "http";
 import getPort from "get-port";
 import { reconstructOuterHTML } from "@/lib/reconstruct-outerhtml.mjs";
 import { injectGenerateUniqueSelectors } from "@/lib/generate-unique-selectors.mjs";
+import { DebugDecorator } from "@watchero/debug-decorator";
 
 describe("reconstructNodes", () => {
     let browser: Browser;
@@ -33,8 +34,10 @@ describe("reconstructNodes", () => {
 
     afterEach(async () => {});
 
-    it("should properly reconstruct outerHTML", async () => {
+    it("should properly reconstruct outerHTML basic", async () => {
         page = await browser.newPage();
+        const debugDecorator = new DebugDecorator();
+        await debugDecorator.decorate({ page });
         await page.goto(`http://localhost:${port}/page.html`);
         await page.evaluate(injectGenerateUniqueSelectors);
         await page.evaluate(() => window.generateUniqueSelectors());
@@ -48,7 +51,7 @@ describe("reconstructNodes", () => {
 
         // let's skip some of the first elements as they are too bulky
         expect(result.map((item) => item.outerHTML).slice(6)).toEqual([
-            '<body class="body"><div id="box1">Box 1</div><div id="box2">Box 2<span>Text</span>Text</div></body>',
+            '<body class="body"><div id="box1">Box 1</div><div id="box2">Box 2<span>Text</span>Text</div><script></script></body>',
             '<div id="box1">Box 1</div>',
             "Box 1",
             '<div id="box2">Box 2<span>Text</span>Text</div>',
@@ -58,11 +61,18 @@ describe("reconstructNodes", () => {
             "Text",
             "",
             "",
+            "<script></script>",
+            `
+        const duplicate = document.getElementById("box1").cloneNode(true);
+        document.documentElement.appendChild(duplicate);
+    `,
+            "<div id=\"box1\">Box 1</div>",
+            "Box 1",
         ]);
         expect(result.map((item) => item.outerHTMLWithoutText)).toEqual([
             "",
             "",
-            '<html><head><style></style></head><body class="body"><div id="box1"></div><div id="box2"><span></span></div></body></html>',
+            '<html><head><style></style></head><body class="body"><div id="box1"></div><div id="box2"><span></span></div><script></script></body><div id="box1"></div></html>',
             "<head><style></style></head>",
             "<style></style>",
             `
@@ -71,7 +81,7 @@ describe("reconstructNodes", () => {
         #box2 { position: absolute; left: 150px; top: 50px; width: 80px; height: 80px; background: blue; }
         #box2::after { content: "Box 2 After"; }
     `,
-            '<body class="body"><div id="box1"></div><div id="box2"><span></span></div></body>',
+            '<body class="body"><div id="box1"></div><div id="box2"><span></span></div><script></script></body>',
             '<div id="box1"></div>',
             "Box 1",
             '<div id="box2"><span></span></div>',
@@ -81,25 +91,36 @@ describe("reconstructNodes", () => {
             "Text",
             "",
             "",
+            "<script></script>",
+            `
+        const duplicate = document.getElementById("box1").cloneNode(true);
+        document.documentElement.appendChild(duplicate);
+    `,
+            "<div id=\"box1\"></div>",
+            "Box 1",
         ]);
 
         expect(result.map((item) => item.domPath)).toEqual([
             undefined,
             undefined,
             "html",
-            "head",
-            "head > style",
-            "head > style > #text:nth-of-type(1)", // text of the style
-            "body.body",
-            "body.body > #box1",
-            "body.body > #box1 > #text:nth-of-type(1)",
-            "body.body > #box2",
-            "body.body > #box2 > #text:nth-of-type(1)",
-            "body.body > #box2 > span",
-            "body.body > #box2 > span > #text:nth-of-type(1)",
-            "body.body > #box2 > #text:nth-of-type(2)",
-            "body.body > #box2 > #comment:nth-of-type(1)",
-            "body.body > #box2 > #comment:nth-of-type(2)",
+            "html > head",
+            "html > head > style",
+            "html > head > style > :nth-text-node(1)", // text of the style
+            "html > body.body",
+            "html > body.body > #box1",
+            "html > body.body > #box1 > :nth-text-node(1)",
+            "html > body.body > #box2",
+            "html > body.body > #box2 > :nth-text-node(1)",
+            "html > body.body > #box2 > span",
+            "html > body.body > #box2 > span > :nth-text-node(1)",
+            "html > body.body > #box2 > :nth-text-node(2)",
+            "html > body.body > #box2 > :nth-comment-node(1)",
+            "html > body.body > #box2 > :nth-comment-node(2)",
+            "html > body.body > script",
+            "html > body.body > script > :nth-text-node(1)",
+            "html > #box1",
+            "html > #box1 > :nth-text-node(1)",
         ]);
 
         //console.log(result.map(item => item.outerHTML));
@@ -141,10 +162,52 @@ describe("reconstructNodes", () => {
             undefined,
             undefined,
             "html",
-            "head",
-            "body.body",
-            "body.body > a[href=\"https\\:\\/\\/google\\.com\\/\"]",
-            "body.body > a[href=\"https\\:\\/\\/google\\.com\\/\"] > img[src=\"https\\:\\/\\/google\\.com\\/\"]",
+            "html > head",
+            "html > body.body",
+            "html > body.body > a[href=\"https\\:\\/\\/google\\.com\\/\"]",
+            "html > body.body > a[href=\"https\\:\\/\\/google\\.com\\/\"] > img[src=\"https\\:\\/\\/google\\.com\\/\"]",
+        ]);
+
+        //console.log(result.map(item => item.outerHTML));
+    });
+
+    it("should properly reconstruct outerHTML with stripping data-fpo and data-wpmeteor attributes", async () => {
+        page = await browser.newPage();
+        await page.goto(`http://localhost:${port}/page-cleanup.html`);
+        await page.evaluate(injectGenerateUniqueSelectors);
+        await page.evaluate(() => window.generateUniqueSelectors());
+
+        const client = await page.createCDPSession();
+        const { root } = await client.send("DOM.getDocument", {
+            depth: -1, // Get the full tree
+            pierce: true, // Pierce through shadow roots
+        });
+        const result = reconstructOuterHTML(root);
+
+        // let's skip some of the first elements as they are too bulky
+        expect(result.map((item) => item.outerHTML)).toEqual([
+            "",
+            "",
+            '<html><head></head><body class="body"><img src="/images/transparent-1x1.png" alt="Image"></img></body></html>',
+            "<head></head>",
+            '<body class="body"><img src="/images/transparent-1x1.png" alt="Image"></img></body>',
+            '<img src="/images/transparent-1x1.png" alt="Image"></img>',
+        ]);
+        expect(result.map((item) => item.outerHTMLWithoutText)).toEqual([
+            "",
+            "",
+            '<html><head></head><body class="body"><img src="" alt=""></img></body></html>',
+            "<head></head>",
+            '<body class="body"><img src="" alt=""></img></body>',
+            '<img src="" alt=""></img>',
+        ]);
+        expect(result.map((item) => item.domPath)).toEqual([
+            undefined,
+            undefined,
+            "html",
+            "html > head",
+            "html > body.body",
+            "html > body.body > #fpo1",
         ]);
 
         //console.log(result.map(item => item.outerHTML));

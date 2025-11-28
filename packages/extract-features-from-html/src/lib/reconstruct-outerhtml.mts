@@ -1,4 +1,3 @@
-import { CustomError } from "@watchero/custom-error";
 import { Protocol } from "puppeteer";
 interface NodeWithOuterHTML extends Protocol.DOM.Node {
     outerHTML: string;
@@ -49,7 +48,6 @@ const excludeAttributesForStructuralTags = [
 
 const dataUriRegex = /^data:([a-z]+\/[a-z0-9.+-]+)?(;[a-z-]+=[a-z0-9-]+)*(;base64)?,([a-z0-9!$&',()*+;=\-._~:@/?%\s]*)$/i;
 
-
 function computeTextContent(node: Protocol.DOM.Node): string {
     if (node.nodeType === 3) {
         // Text node
@@ -72,7 +70,7 @@ function computeTextContent(node: Protocol.DOM.Node): string {
                 }
             }
         }
-        if (node.nodeName === "script" || node.nodeName === "style") {
+        if (tag === "script" || tag === "style") {
             // We don't want to include the content of script or style tags in the text content.
             return textContent;
         }
@@ -107,6 +105,14 @@ function computeOuterHTML(node: Protocol.DOM.Node, includeText: boolean = false)
                     // Skip selector attribute.
                     continue;
                 }
+                if (attrName.startsWith("data-fpo-") || attrName.startsWith("data-wpmeteor-")) {
+                    // Skip fastpixel-related attributes
+                    continue;
+                }
+                if (attrName === "id" && node.attributes[i + 1].match(/^fpo[0-9]+$/)) {
+                    // Skip fastpixel element IDs
+                    continue;
+                }
                 if (!includeText) {
                     if (
                         // Skip data-* attributes, as data in them doesn't reflect structure
@@ -125,10 +131,16 @@ function computeOuterHTML(node: Protocol.DOM.Node, includeText: boolean = false)
                         continue;
                     }
                 }
-                const attrValue = dataUriRegex.test(node.attributes[i + 1])
+                let attrValue = dataUriRegex.test(node.attributes[i + 1])
                     ? node.attributes[i + 1].replace(",.*", ",...")
                     : node.attributes[i + 1];
-                attrStr += ` ${attrName}="${attrValue}"`;
+                // attrValue = attrValue.replace(/fpo-lazyloaded/g, "");
+                const updatedAttrValue = attrValue.replace(/fpo-lazyloaded/g, "").trim();
+                if (attrName === "class" && updatedAttrValue !== attrValue && updatedAttrValue === "") {
+                    // skip empty class attributes
+                    continue;
+                }
+                attrStr += ` ${attrName}="${updatedAttrValue}"`;
             }
         }
         if (tag === "script" || tag === "style" || tag === "link" || tag === "meta") {
@@ -178,7 +190,7 @@ function getDOMPath(node: Protocol.DOM.Node): string | undefined {
             }
         }
     }
-    throw new CustomError("No selector found for the node: " + computeOuterHTML(node));
+    throw new Error("No selector found for the node: " + computeOuterHTML(node));
 }
 
 export function reconstructOuterHTML(node: Protocol.DOM.Node): NodeWithOuterHTML[] {
@@ -193,14 +205,15 @@ export function reconstructOuterHTML(node: Protocol.DOM.Node): NodeWithOuterHTML
         const textContent = computeTextContent(node);
 
         let domPath: string | undefined;
+        // Special handling for text and comment nodes to ensure uniqueness
         if (node.nodeType === 3) {
             let n = textCounter.get(parentDomPath || "") || 1;
             textCounter.set(parentDomPath || "", n + 1);
-            domPath = parentDomPath + " > " + node.nodeName + `:nth-of-type(${n})`;
+            domPath = parentDomPath + " > " + `:nth-text-node(${n})`;
         } else if (node.nodeType === 8) {
             let n = commentCounter.get(parentDomPath || "") || 1;
             commentCounter.set(parentDomPath || "", n + 1);
-            domPath = parentDomPath + " > " + node.nodeName + `:nth-of-type(${n})`;
+            domPath = parentDomPath + " > " + `:nth-comment-node(${n})`;
         } else {
             domPath = getDOMPath(node);
         }

@@ -1,12 +1,42 @@
 import { Page, Protocol } from "puppeteer";
-import { CustomError } from "@watchero/custom-error";
 import { reconstructOuterHTML } from "./lib/reconstruct-outerhtml.mjs";
 import { injectGenerateUniqueSelectors } from "./lib/generate-unique-selectors.mjs";
 import { HTMLElementFeature } from "@watchero/types";
 
 const computedStyles = ["content"];
 
-export async function extractFeaturesFromHTML(page: Page, _magicRatio = 0.5): Promise<HTMLElementFeature[]> {
+// export interface HTMLElementFeature {
+//     id: number;
+//     parentId?: number;
+//     nodeName: string;
+//     outerHTML: string;
+//     outerHTMLWithoutText: string;
+//     textContent: string;
+//     domPath?: string;
+//     content?: string;
+//     bbox: {
+//         top: number;
+//         right: number;
+//         bottom: number;
+//         left: number;
+//         width: number;
+//         height: number;
+//         x: number;
+//         y: number;
+//     };
+// }
+
+function getAttributeValue(node: Protocol.DOM.Node, attrName: string): string | null {
+    if (node.attributes && node.attributes.length > 0) {
+        const index = node.attributes.findIndex((attr, i) => i % 2 === 0 && attr === attrName);
+        if (index !== -1) {
+            return node.attributes[index + 1] || null;
+        }
+    }
+    return null;
+}
+
+export async function extractFeaturesFromHTML(page: Page, _magicRatio = 1): Promise<HTMLElementFeature[]> {
     await page.evaluate(injectGenerateUniqueSelectors);
     await page.evaluate(() => window.generateUniqueSelectors());
 
@@ -31,19 +61,19 @@ export async function extractFeaturesFromHTML(page: Page, _magicRatio = 0.5): Pr
     const { nodeName, nodeType, nodeValue, backendNodeId, parentIndex } = nodes;
 
     if (!nodeName) {
-        throw new CustomError("Invalid snapshot data structure.");
+        throw new Error("Invalid snapshot data structure.");
     }
 
     if (!nodeType) {
-        throw new CustomError("Invalid snapshot data structure.");
+        throw new Error("Invalid snapshot data structure.");
     }
 
     if (!backendNodeId) {
-        throw new CustomError("Invalid snapshot data structure.");
+        throw new Error("Invalid snapshot data structure.");
     }
 
     if (!parentIndex) {
-        throw new CustomError("Invalid layout data structure.");
+        throw new Error("Invalid layout data structure.");
     }
 
     // Find the index of the <body> element.
@@ -56,7 +86,7 @@ export async function extractFeaturesFromHTML(page: Page, _magicRatio = 0.5): Pr
     }
 
     if (bodyIndex === null) {
-        throw new CustomError("No <body> element found in snapshot.");
+        throw new Error("No <body> element found in snapshot.");
     }
 
     // Helper: determine if a given node (by index) is a descendant of <body>
@@ -72,7 +102,16 @@ export async function extractFeaturesFromHTML(page: Page, _magicRatio = 0.5): Pr
 
     const seenBackendNodeId = new Set<number>();
 
-    const promises = document.layout.nodeIndex.map(async (junk, nodeIndex): Promise<HTMLElementFeature | undefined> => {
+    // const results = nodes.backendNodeId?.map((junk, i) => {
+    //     const nodeIndex = document.layout.nodeIndex.findIndex((value) => value === i);
+
+    // Let me reason for my future self about this code:
+    // layout in chromium 144 doesn't have some nodes that are visible, have width (2x186) 
+    // and positionned absolutely, http://darwinapps.pl/ 
+    // they will be reported missing by diff, but we don't want to workaround it
+    // if I did it, I would iterate over all nodes here, eg nodes.backendNodeId
+    // but then we can't distinguish nodes that actually disappeared from layout due to CSS changes
+    const results = document.layout.nodeIndex.map((junk, nodeIndex): HTMLElementFeature | undefined => {
         const i = layout.nodeIndex[nodeIndex];
 
         if (seenBackendNodeId.has(backendNodeId[i])) {
@@ -98,11 +137,13 @@ export async function extractFeaturesFromHTML(page: Page, _magicRatio = 0.5): Pr
         }
 
         const computedStyle: { [key: string]: string } = {};
+        // if (nodeIndex > -1) {
         for (let styleIndex in document.layout.styles[nodeIndex]) {
             const stringIndex = document.layout.styles[nodeIndex][styleIndex];
             const property = computedStyles[Number(styleIndex)];
             computedStyle[property] = snapshot.strings[stringIndex];
         }
+        // }
 
         const pseudoPosition = nodes.pseudoType ? nodes.pseudoType.index.indexOf(i) : -1;
 
@@ -120,7 +161,9 @@ export async function extractFeaturesFromHTML(page: Page, _magicRatio = 0.5): Pr
             }
         }
 
-        const [left, top, width, height] = layout.bounds[nodeIndex].map((value: number) => value); // * _magicRatio);
+        // let bbox = { top: -1, right: -2, bottom: -2, left: -1 }; // default invalid bbox
+        // if (nodeIndex > -1) {
+        const [left, top, width, height] = layout.bounds[nodeIndex].map((value: number) => value * _magicRatio);
 
         // they can be undefined for things like documentElement
         // if (!top && !left && !width && !height) {
@@ -130,10 +173,9 @@ export async function extractFeaturesFromHTML(page: Page, _magicRatio = 0.5): Pr
 
         const right = left + width;
         const bottom = top + height;
-        const x = left;
-        const y = top;
 
-        const bbox = { top, right, bottom, left, width, height, x, y }; // we're going to reuse width & height
+        const bbox = { top, right, bottom, left }; // we're going to reuse width & height
+        // }
 
         // lets use reconstructedNodes to find the outerHTML
         // instead of "DOM.getOuterHTML"
@@ -160,9 +202,36 @@ export async function extractFeaturesFromHTML(page: Page, _magicRatio = 0.5): Pr
         const { outerHTML, outerHTMLWithoutText, textContent } = node;
         const content = computedStyle.content === "normal" ? undefined : computedStyle.content;
         const parentId = i !== bodyIndex ? parentIndex[i] : undefined;
-
+        // let's find text node bbox if any
+        const textBBoxIndexes = document.textBoxes.layoutIndex
+            ?.map((layoutIndex, index) => (layoutIndex === nodeIndex ? index : -1))
+            .filter((index) => index !== -1);
+        const textBBoxes = textBBoxIndexes.map((textBoxIndex) => {
+            const [left, top, width, height] = document.textBoxes.bounds[textBoxIndex].map(
+                (value: number) => value * _magicRatio
+            );
+            return {
+                left,
+                top,
+                right: left + width,
+                bottom: top + height,
+            };
+        });
+        if (textBBoxes.length === 0) {
+            // special handling for ::before and ::after
+            if (content) {
+                textBBoxes.push(bbox);
+            } else if (tagName === "input" || tagName === "textarea" || tagName === "submit") {
+                if (getAttributeValue(node, "value")) {
+                    textBBoxes.push(bbox);
+                } else if (getAttributeValue(node, "placeholder")) {
+                    textBBoxes.push(bbox);
+                }
+                textBBoxes.push(bbox);
+            }
+        }
         seenBackendNodeId.add(backendNodeId[i]);
-
+        const nodeNameLower = snapshot.strings[nodeName[i]].toLowerCase();
         return {
             id: i,
             parentId,
@@ -170,14 +239,14 @@ export async function extractFeaturesFromHTML(page: Page, _magicRatio = 0.5): Pr
             outerHTML,
             outerHTMLWithoutText,
             textContent: textContent.trim(),
-            domPath: node.domPath,
+            domPath: node.domPath + (nodeNameLower.startsWith(":") ? nodeNameLower : ""),
             // outerHTMLVector: textToBigramVector(outerHTMLWithoutText),
             content,
             bbox,
+            textBBoxes,
         };
-    });
+    }); 
 
-    const results = await Promise.all(promises);
     const filteredResults = results.filter(Boolean) as HTMLElementFeature[];
     return filteredResults;
 }
